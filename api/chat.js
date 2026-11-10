@@ -5,7 +5,7 @@
 
 const { calculateQuote } = require('../lib/quote-engine.js');
 const { getMenuData, menuPromptText } = require('../lib/menu-source.js');
-const { SYSTEM_KNOWLEDGE } = require('../lib/knowledge.js');
+const { SYSTEM_KNOWLEDGE, CLASSIC_DRINKS } = require('../lib/knowledge.js');
 const { sendLeadAlert } = require('../lib/lead-notify.js');
 const { logLead } = require('../lib/sheet-log.js');
 const { logChat } = require('../lib/chat-log.js');
@@ -129,6 +129,21 @@ function todayText() {
   const d = new Date(Date.now() + 9 * 3600 * 1000);
   const w = '일월화수목금토'[d.getUTCDay()];
   return `오늘: ${d.toISOString().slice(0, 10)} (${w}) — 한국 시간`;
+}
+
+// 커피 세트(2·4·7종) 견적에서 음료 구성을 묻는 답 → { kind:'drinks', count, defaults, options }
+function drinkPicker(reply) {
+  const t = String(reply || '');
+  if (!/음료는 기본 구성|바꾸고 싶은 음료|원하시는 음료로|음료를 골라|음료 구성/.test(t) || !/\?|말씀해 주세요|정하셔도/.test(t)) return null;
+  const m = t.match(/\(커피음료\s*([247])종\)[^\n]*\n\s*└\s*([^\n]+)/);
+  if (!m) return null;
+  const count = Number(m[1]);
+  const base = (x) => x.replace(/\(아이스\)/g, '').trim();
+  const line = m[2].includes('기본') ? m[2].split(/기본[:：]?/).pop() : m[2];   // "15종 중 7가지 선택 (기본: …)" → 기본 뒤만
+  const defaults = line.replace(/[()*]/g, ' ').split(/[·,/]/).map((x) => x.trim()).filter((x) => x && x.length <= 14)
+    .map((x) => CLASSIC_DRINKS.find((c) => base(c) === base(x)) || x);   // "아이스티" → 목록 이름 "아이스티(아이스)"
+  const options = [...new Set([...defaults, ...CLASSIC_DRINKS])];
+  return { kind: 'drinks', count, defaults: defaults.slice(0, count), options };
 }
 
 module.exports = async function handler(req, res) {
@@ -255,7 +270,10 @@ module.exports = async function handler(req, res) {
       const vctx = globalThis[Symbol.for('@vercel/request-context')];
       const ctx = vctx && typeof vctx.get === 'function' ? vctx.get() : null;
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(logP); else await logP;
-      return res.status(200).json({ reply, usage });
+      // 음료 구성을 묻는 답이면 화면 아래(입력칸 위)에 '음료 고르기' 버튼을 띄우게 목록을 같이 보냄
+      // (대화가 길면 메뉴는 위, 답은 아래라 손님이 위아래로 오가야 했음)
+      const picker = drinkPicker(reply);
+      return res.status(200).json(picker ? { reply, usage, picker } : { reply, usage });
     }
 
     return res.status(200).json({ reply: '죄송해요, 잠시 후 다시 시도해 주세요.' });
