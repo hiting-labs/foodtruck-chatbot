@@ -118,6 +118,7 @@ select:focus,.body input:focus,.body textarea:focus{outline:none;border-color:va
 .qtotal .lab{font-size:14px;color:var(--muted)}
 .qtotal .val{font-family:'Jua',sans-serif;font-size:27px;color:var(--tomato-deep);text-align:right}
 .qnote{font-size:13px;color:var(--muted);margin-top:11px;line-height:1.6}
+.qnote.venue{color:var(--ink);font-weight:600}
 .consult{margin-top:13px;background:#FFF4F1;border:1.5px solid var(--tomato);border-radius:12px;padding:13px 14px;font-size:14px;line-height:1.65}
 .consult b{display:block;color:var(--tomato-deep);font-weight:700;margin-bottom:6px;font-size:15px}
 .omore{margin-top:14px;background:#FFF7F0;border:1.5px solid var(--amber);border-radius:16px;padding:16px}
@@ -713,6 +714,7 @@ document.getElementById('calc').onclick=()=>{
     ${lines}${info}
     <div class="qtotal"><span class="lab">예상 금액 (VAT 별도)</span>${valHtml}</div>
     <div class="qnote">${note}</div>${adj}
+    ${R.venueNotice?`<div class="qnote venue">📍 ${R.venueNotice}</div>`:''}
     ${consult}${echo}
     <div id="sendStatus" class="qnote" style="margin-top:10px;font-weight:700;color:var(--tomato-deep)"></div>
   </div>
