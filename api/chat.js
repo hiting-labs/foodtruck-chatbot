@@ -5,11 +5,16 @@
 
 const { calculateQuote } = require('../lib/quote-engine.js');
 const { getMenuData, menuPromptText } = require('../lib/menu-source.js');
-const { SYSTEM_KNOWLEDGE } = require('../lib/knowledge.js');
+const { SYSTEM_KNOWLEDGE, CLASSIC_DRINKS } = require('../lib/knowledge.js');
 const { sendLeadAlert } = require('../lib/lead-notify.js');
 const { logLead } = require('../lib/sheet-log.js');
 const { logChat } = require('../lib/chat-log.js');
 const { capacityCheck, capacityGuide } = require('../lib/capacity.js');
+const { checkRate, limitMessage } = require('../lib/rate-limit.js');
+
+// 대화 크기 제한 (비용·악용 방지): 손님 말 40번 넘으면 전화 안내, 한 말은 2,000자까지
+const MAX_USER_TURNS = Number(process.env.CHAT_MAX_TURNS) || 40;
+const MAX_USER_CHARS = 2000, MAX_BOT_CHARS = 6000, MAX_MESSAGES = 100;
 
 // 상담용 모델. 환경변수 CHAT_MODEL로 바꿀 수 있음(기본 claude-sonnet-5-5, 되돌리려면 claude-sonnet-4-6). Sonnet 5.5는 생각 설정(CHAT_THINKING·CHAT_EFFORT)을 같이 맞춤
 const MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5-5';   // 2026-11-10 4.6 → 5.5 (회귀 17개·시험 손님 30명 비교: 2배 빠르고 약 1/3 저렴, 품질 같거나 나음)
@@ -131,14 +136,44 @@ function todayText() {
   return `오늘: ${d.toISOString().slice(0, 10)} (${w}) — 한국 시간`;
 }
 
+// 커피 세트(2·4·7종) 견적에서 음료 구성을 묻는 답 → { kind:'drinks', count, defaults, options }
+function drinkPicker(reply) {
+  const t = String(reply || '');
+  if (!/음료는 기본 구성|바꾸고 싶은 음료|원하시는 음료로|음료를 골라|음료 구성/.test(t) || !/\?|말씀해 주세요|정하셔도/.test(t)) return null;
+  const m = t.match(/\(커피음료\s*([247])종\)[^\n]*\n\s*└\s*([^\n]+)/);
+  if (!m) return null;
+  const count = Number(m[1]);
+  const base = (x) => x.replace(/\(아이스\)/g, '').trim();
+  const line = m[2].includes('기본') ? m[2].split(/기본[:：]?/).pop() : m[2];   // "15종 중 7가지 선택 (기본: …)" → 기본 뒤만
+  const defaults = line.replace(/[()*]/g, ' ').split(/[·,/]/).map((x) => x.trim()).filter((x) => x && x.length <= 14)
+    .map((x) => CLASSIC_DRINKS.find((c) => base(c) === base(x)) || x);   // "아이스티" → 목록 이름 "아이스티(아이스)"
+  const options = [...new Set([...defaults, ...CLASSIC_DRINKS])];
+  return { kind: 'drinks', count, defaults: defaults.slice(0, count), options };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }
   try {
-    const { messages, sessionId, page } = req.body || {};
-    if (!Array.isArray(messages)) {
+    const { messages: rawMessages, sessionId, page } = req.body || {};
+    if (!Array.isArray(rawMessages)) {
       return res.status(400).json({ error: 'messages 배열이 필요합니다.' });
+    }
+    // 손님 화면이 보내는 건 글자 대화뿐 — 그 외 모양은 버리고, 너무 긴 말은 자름
+    const messages = rawMessages
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+      .slice(-MAX_MESSAGES)
+      .map(m => ({ role: m.role, content: m.content.slice(0, m.role === 'user' ? MAX_USER_CHARS : MAX_BOT_CHARS) }));
+    while (messages.length && messages[0].role !== 'user') messages.shift();
+    if (!messages.length) return res.status(400).json({ error: '메시지가 비어 있어요.' });
+
+    // 호출 횟수 제한 — 걸리면 AI를 부르지 않고 안내만 (손님 화면엔 보통 답처럼 보임)
+    const rate = await checkRate('chat', req);
+    if (!rate.ok) return res.status(200).json({ reply: limitMessage(rate.why), limited: rate.why });
+    const lastSaysPhone = /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/.test(messages[messages.length - 1].content);   // 연락처를 남기는 말은 길어도 받아서 접수
+    if (messages.filter(m => m.role === 'user').length > MAX_USER_TURNS && !lastSaysPhone) {
+      return res.status(200).json({ reply: '대화가 길어져서 여기부터는 담당자가 직접 도와드리는 게 정확해요. 대표번호 1877-6901로 전화 주시거나, 성함과 연락처를 남겨 주시면 담당자가 연락드릴게요. 새로 상담하시려면 위의 ↺ 새로 시작을 눌러 주세요.', limited: 'turns' });
     }
 
     const convo = [...messages];
@@ -255,7 +290,10 @@ module.exports = async function handler(req, res) {
       const vctx = globalThis[Symbol.for('@vercel/request-context')];
       const ctx = vctx && typeof vctx.get === 'function' ? vctx.get() : null;
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(logP); else await logP;
-      return res.status(200).json({ reply, usage });
+      // 음료 구성을 묻는 답이면 화면 아래(입력칸 위)에 '음료 고르기' 버튼을 띄우게 목록을 같이 보냄
+      // (대화가 길면 메뉴는 위, 답은 아래라 손님이 위아래로 오가야 했음)
+      const picker = drinkPicker(reply);
+      return res.status(200).json(picker ? { reply, usage, picker } : { reply, usage });
     }
 
     return res.status(200).json({ reply: '죄송해요, 잠시 후 다시 시도해 주세요.' });
