@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { logLead } = require('../lib/sheet-log.js');
+const { logChat } = require('../lib/chat-log.js');
 
 function readRaw(req) {
   return new Promise((resolve) => {
@@ -51,11 +52,6 @@ module.exports = async function handler(req, res) {
   const pfId = (process.env.KAKAO_PFID || '').trim();
   const templateId = (process.env.KAKAO_TEMPLATE_ID || '').trim();
 
-  if (!apiKey || !apiSecret || !from || !to) {
-    res.status(500).json({ ok: false, error: '환경변수가 비어 있습니다. SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER, ALERT_TO 를 확인하세요.' });
-    return;
-  }
-
   // 본문 파싱
   let data = req.body;
   if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = null; } }
@@ -63,6 +59,25 @@ module.exports = async function handler(req, res) {
     const raw = await readRaw(req);
     try { data = JSON.parse(raw || '{}'); } catch (e) { data = {}; }
   }
+
+  // 보드 '챗봇 상담'에도 남김(간편 견적 상담 신청) — 문자 성공 여부와 무관. 실패해도 무시
+  if (data && data.board && typeof data.board === 'object') {
+    try {
+      const b = data.board, tools = [];
+      if (b.lead && typeof b.lead === 'object') tools.push({ name: 'submit_lead', input: b.lead, status: 'submitted' });
+      if (b.quote && typeof b.quote === 'object') tools.push(Object.assign({ name: 'calculate_quote', status: 'ok' }, b.quote));
+      const meta = { source: 'quick', tools };
+      if (JSON.stringify(meta).length < 20000) {
+        await logChat({ sessionId: b.sid, page: 'quick', userText: (data.message || '').toString().slice(0, 3000), reply: String(b.reply || '간편 견적 화면에서 상담 신청').slice(0, 1000), meta });
+      }
+    } catch (e) {}
+  }
+
+  if (!apiKey || !apiSecret || !from || !to) {
+    res.status(500).json({ ok: false, error: '환경변수가 비어 있습니다. SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER, ALERT_TO 를 확인하세요.' });
+    return;
+  }
+
 
   // 문자(대체발송)용 전체 텍스트
   const text = (data.message || '새 견적 신청이 접수되었습니다.').toString().slice(0, 1000);

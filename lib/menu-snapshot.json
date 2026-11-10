@@ -1,0 +1,1013 @@
+{
+"_note": "site_menus 사본 — 메뉴판(보드 DB)에 연결이 안 될 때만 씀. 2026-11-05 운영 메뉴판 기준",
+"rows": [
+{
+"category": "커피음료",
+"name": "실속세트(커피음료 2종)",
+"spec": "인",
+"unit_price": 3000,
+"type": "menu",
+"note": "하절기: 아메리카노·복숭아아이스티 / 동절기: 아메리카노·핫초코",
+"sort_order": 10
+},
+{
+"category": "커피음료",
+"name": "간편세트(커피음료 4종)",
+"spec": "인",
+"unit_price": 3300,
+"type": "menu",
+"note": "하절기: 아메리카노·복숭아아이스티·애플캐모마일·레몬에이드 / 동절기: 아메리카노·핫초코·애플캐모마일·유자차",
+"sort_order": 20
+},
+{
+"category": "커피음료",
+"name": "베이직세트(커피음료 7종)",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": "15종 중 택7 (기본: 아메리카노·카페라떼·바닐라라떼·복숭아아이스티·레몬에이드·청포도에이드·자몽에이드)",
+"sort_order": 30
+},
+{
+"category": "커피음료",
+"name": "클래식세트(커피음료 15종+)",
+"spec": "인",
+"unit_price": 4000,
+"type": "menu",
+"note": null,
+"sort_order": 40
+},
+{
+"category": "간식류",
+"name": "츄러스(30cm)",
+"spec": "인",
+"unit_price": 3000,
+"type": "menu",
+"note": null,
+"sort_order": 50
+},
+{
+"category": "간식류",
+"name": "핫바",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 60
+},
+{
+"category": "간식류",
+"name": "소떡소떡",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 70
+},
+{
+"category": "간식류",
+"name": "그릴소세지",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 80
+},
+{
+"category": "간식류",
+"name": "옛날핫도그",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 90
+},
+{
+"category": "간식류",
+"name": "미니붕어빵(5ea)",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 100
+},
+{
+"category": "간식류",
+"name": "회오리감자",
+"spec": "인",
+"unit_price": 4000,
+"type": "menu",
+"note": null,
+"sort_order": 110
+},
+{
+"category": "간식류",
+"name": "감자핫도그",
+"spec": "인",
+"unit_price": 4500,
+"type": "menu",
+"note": null,
+"sort_order": 120
+},
+{
+"category": "간식류",
+"name": "페스츄리핫도그",
+"spec": "인",
+"unit_price": 4500,
+"type": "menu",
+"note": null,
+"sort_order": 130
+},
+{
+"category": "간식류",
+"name": "후라이드닭꼬치",
+"spec": "인",
+"unit_price": 4500,
+"type": "menu",
+"note": null,
+"sort_order": 140
+},
+{
+"category": "간식류",
+"name": "닭꼬치",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 150
+},
+{
+"category": "간식류",
+"name": "타코야끼(10ea)",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 160
+},
+{
+"category": "간식류",
+"name": "컵 닭강정",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 170
+},
+{
+"category": "디저트&베이커리",
+"name": "쿠키",
+"spec": "인",
+"unit_price": 2000,
+"type": "menu",
+"note": null,
+"sort_order": 180
+},
+{
+"category": "간식류",
+"name": "팝콘(소)",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 185
+},
+{
+"category": "디저트&베이커리",
+"name": "휘낭시에",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 190
+},
+{
+"category": "디저트&베이커리",
+"name": "마들렌",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 200
+},
+{
+"category": "디저트&베이커리",
+"name": "마카롱",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 210
+},
+{
+"category": "디저트&베이커리",
+"name": "대만샌드위치",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 220
+},
+{
+"category": "디저트&베이커리",
+"name": "컵 솜사탕",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 230
+},
+{
+"category": "디저트&베이커리",
+"name": "뉴욕식 핫도그",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 240
+},
+{
+"category": "디저트&베이커리",
+"name": "크로와상 샌드위치",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 250
+},
+{
+"category": "디저트&베이커리",
+"name": "클럽 샌드위치",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 260
+},
+{
+"category": "컵과일&아이스크림",
+"name": "컵과일(9oz)",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 270
+},
+{
+"category": "디저트&베이커리",
+"name": "버터떡",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 275
+},
+{
+"category": "컵과일&아이스크림",
+"name": "컵과일(12oz)",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 280
+},
+{
+"category": "컵과일&아이스크림",
+"name": "스쿱 아이스크림",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 290
+},
+{
+"category": "컵과일&아이스크림",
+"name": "소프트아이스크림",
+"spec": "인",
+"unit_price": 4000,
+"type": "menu",
+"note": null,
+"sort_order": 300
+},
+{
+"category": "컵과일&아이스크림",
+"name": "젤라또 아이스크림",
+"spec": "인",
+"unit_price": 4500,
+"type": "menu",
+"note": null,
+"sort_order": 310
+},
+{
+"category": "컵과일&아이스크림",
+"name": "팥빙수",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 320
+},
+{
+"category": "컵과일&아이스크림",
+"name": "망고빙수",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 330
+},
+{
+"category": "컵과일&아이스크림",
+"name": "베리빙수",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 340
+},
+{
+"category": "컵과일&아이스크림",
+"name": "아이스크림빙수",
+"spec": "인",
+"unit_price": 7000,
+"type": "menu",
+"note": null,
+"sort_order": 350
+},
+{
+"category": "분식류",
+"name": "떡볶이",
+"spec": "인",
+"unit_price": 4000,
+"type": "menu",
+"note": null,
+"sort_order": 360
+},
+{
+"category": "분식류",
+"name": "튀김",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 370
+},
+{
+"category": "분식류",
+"name": "순대",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 380
+},
+{
+"category": "분식류",
+"name": "어묵(2ea+국물)",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 390
+},
+{
+"category": "컵과일&아이스크림",
+"name": "아츄(스쿱)",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 392
+},
+{
+"category": "컵과일&아이스크림",
+"name": "아츄(젤라또)",
+"spec": "인",
+"unit_price": 7000,
+"type": "menu",
+"note": null,
+"sort_order": 394
+},
+{
+"category": "컵과일&아이스크림",
+"name": "수박화채",
+"spec": "인",
+"unit_price": 5000,
+"type": "menu",
+"note": null,
+"sort_order": 396
+},
+{
+"category": "컵과일&아이스크림",
+"name": "수박주스",
+"spec": "인",
+"unit_price": 5500,
+"type": "menu",
+"note": null,
+"sort_order": 398
+},
+{
+"category": "분식류",
+"name": "어떡(어묵1+물떡1)",
+"spec": "인",
+"unit_price": 3000,
+"type": "menu",
+"note": null,
+"sort_order": 400
+},
+{
+"category": "분식류",
+"name": "분식 2종(떡튀/떡순/떡어)",
+"spec": "인",
+"unit_price": 6000,
+"type": "menu",
+"note": null,
+"sort_order": 410
+},
+{
+"category": "분식류",
+"name": "분식 3종(떡튀순/떡튀어/떡순어)",
+"spec": "인",
+"unit_price": 8000,
+"type": "menu",
+"note": null,
+"sort_order": 420
+},
+{
+"category": "분식류",
+"name": "떡튀순어",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 430
+},
+{
+"category": "겨울간식",
+"name": "씨앗호떡",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 440
+},
+{
+"category": "겨울간식",
+"name": "옛날꿀호떡",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 450
+},
+{
+"category": "겨울간식",
+"name": "호빵",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 460
+},
+{
+"category": "겨울간식",
+"name": "꿀 가래떡 꼬치(2ea)",
+"spec": "인",
+"unit_price": 2500,
+"type": "menu",
+"note": null,
+"sort_order": 470
+},
+{
+"category": "겨울간식",
+"name": "미니붕어빵(5ea)",
+"spec": "인",
+"unit_price": 3500,
+"type": "menu",
+"note": null,
+"sort_order": 480
+},
+{
+"category": "식사-덮밥류",
+"name": "제육 덮밥",
+"spec": "인",
+"unit_price": 8000,
+"type": "menu",
+"note": null,
+"sort_order": 490
+},
+{
+"category": "식사-덮밥류",
+"name": "간장제육 덮밥",
+"spec": "인",
+"unit_price": 8000,
+"type": "menu",
+"note": null,
+"sort_order": 500
+},
+{
+"category": "식사-덮밥류",
+"name": "치킨마요 덮밥",
+"spec": "인",
+"unit_price": 8000,
+"type": "menu",
+"note": null,
+"sort_order": 510
+},
+{
+"category": "식사-덮밥류",
+"name": "스팸마요 덮밥",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 520
+},
+{
+"category": "식사-덮밥류",
+"name": "돈까스마요 덮밥",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 530
+},
+{
+"category": "식사-덮밥류",
+"name": "짜장군만두 덮밥",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 540
+},
+{
+"category": "식사-덮밥류",
+"name": "돈까스카레 덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 550
+},
+{
+"category": "식사-덮밥류",
+"name": "닭갈비 덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 560
+},
+{
+"category": "식사-덮밥류",
+"name": "간장닭갈비 덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 570
+},
+{
+"category": "식사-덮밥류",
+"name": "불닭 덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 580
+},
+{
+"category": "식사-덮밥류",
+"name": "흑돼지 덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 590
+},
+{
+"category": "식사-덮밥류",
+"name": "규동",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 600
+},
+{
+"category": "식사-덮밥류",
+"name": "소불고기덮밥",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 610
+},
+{
+"category": "식사-덮밥류",
+"name": "돈토로동",
+"spec": "인",
+"unit_price": 12000,
+"type": "menu",
+"note": null,
+"sort_order": 620
+},
+{
+"category": "식사-덮밥류",
+"name": "스테이크 덮밥",
+"spec": "인",
+"unit_price": 13000,
+"type": "menu",
+"note": null,
+"sort_order": 630
+},
+{
+"category": "식사-누들류",
+"name": "잔치국수",
+"spec": "인",
+"unit_price": 7500,
+"type": "menu",
+"note": null,
+"sort_order": 640
+},
+{
+"category": "식사-누들류",
+"name": "어묵우동",
+"spec": "인",
+"unit_price": 8000,
+"type": "menu",
+"note": null,
+"sort_order": 650
+},
+{
+"category": "식사-누들류",
+"name": "비빔국수",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 660
+},
+{
+"category": "식사-누들류",
+"name": "볶음우동",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 670
+},
+{
+"category": "식사-누들류",
+"name": "냉우동",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 680
+},
+{
+"category": "식사-누들류",
+"name": "짜장면",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 690
+},
+{
+"category": "식사-누들류",
+"name": "냉소바",
+"spec": "인",
+"unit_price": 9000,
+"type": "menu",
+"note": null,
+"sort_order": 695
+},
+{
+"category": "식사-누들류",
+"name": "야끼소바",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 700
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "떡국",
+"spec": "인",
+"unit_price": 8500,
+"type": "menu",
+"note": null,
+"sort_order": 710
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "비빔밥",
+"spec": "인",
+"unit_price": 11000,
+"type": "menu",
+"note": null,
+"sort_order": 720
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "닭강정",
+"spec": "인",
+"unit_price": 12000,
+"type": "menu",
+"note": null,
+"sort_order": 730
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "오코노미야끼",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 740
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "닭목살구이",
+"spec": "인",
+"unit_price": 14000,
+"type": "menu",
+"note": null,
+"sort_order": 750
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "소세지플래터",
+"spec": "인",
+"unit_price": 14000,
+"type": "menu",
+"note": null,
+"sort_order": 760
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "치킨윙봉",
+"spec": "인",
+"unit_price": 15000,
+"type": "menu",
+"note": null,
+"sort_order": 770
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "숯불치킨",
+"spec": "인",
+"unit_price": 15000,
+"type": "menu",
+"note": null,
+"sort_order": 780
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "목살 플래터",
+"spec": "인",
+"unit_price": 15000,
+"type": "menu",
+"note": null,
+"sort_order": 790
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "감바스알하이오",
+"spec": "인",
+"unit_price": 15000,
+"type": "menu",
+"note": null,
+"sort_order": 800
+},
+{
+"category": "식사-기타 및 안주류",
+"name": "부채살 큐브스테이크",
+"spec": "인",
+"unit_price": 18000,
+"type": "menu",
+"note": null,
+"sort_order": 810
+},
+{
+"category": "뷔페",
+"name": "뷔페 하",
+"spec": "인",
+"unit_price": 10000,
+"type": "menu",
+"note": null,
+"sort_order": 810
+},
+{
+"category": "뷔페",
+"name": "뷔페 우",
+"spec": "인",
+"unit_price": 15000,
+"type": "menu",
+"note": null,
+"sort_order": 812
+},
+{
+"category": "뷔페",
+"name": "뷔페 스",
+"spec": "인",
+"unit_price": 20000,
+"type": "menu",
+"note": null,
+"sort_order": 814
+},
+{
+"category": "출장비",
+"name": "서울·경기남부",
+"spec": "대",
+"unit_price": 100000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 850
+},
+{
+"category": "부대",
+"name": "출장비",
+"spec": "대",
+"unit_price": null,
+"type": "extra",
+"note": "지역별 변동 — 단가 수기 입력",
+"sort_order": 850
+},
+{
+"category": "출장비",
+"name": "경기북부·외곽",
+"spec": "대",
+"unit_price": 120000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 851
+},
+{
+"category": "출장비",
+"name": "천안·아산",
+"spec": "대",
+"unit_price": 120000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 852
+},
+{
+"category": "출장비",
+"name": "충청도권",
+"spec": "대",
+"unit_price": 150000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 853
+},
+{
+"category": "출장비",
+"name": "강원도권",
+"spec": "대",
+"unit_price": 200000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 854
+},
+{
+"category": "출장비",
+"name": "전라북도권",
+"spec": "대",
+"unit_price": 200000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 855
+},
+{
+"category": "출장비",
+"name": "전라남도권",
+"spec": "대",
+"unit_price": 300000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 856
+},
+{
+"category": "출장비",
+"name": "경상북도권",
+"spec": "대",
+"unit_price": 200000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 857
+},
+{
+"category": "출장비",
+"name": "경상남도권",
+"spec": "대",
+"unit_price": 300000,
+"type": "extra",
+"note": "거리·대수에 따라 상담직원과 협의 가능",
+"sort_order": 858
+},
+{
+"category": "출장비",
+"name": "제주·섬지역권",
+"spec": "대",
+"unit_price": null,
+"type": "extra",
+"note": "별도 상세 안내 — 상담직원 연결",
+"sort_order": 859
+},
+{
+"category": "부대",
+"name": "시간추가",
+"spec": "대",
+"unit_price": null,
+"type": "extra",
+"note": "시간당 — 단가 수기 입력",
+"sort_order": 860
+},
+{
+"category": "기타비용",
+"name": "자가발전기 대여",
+"spec": "대",
+"unit_price": 50000,
+"type": "extra",
+"note": "전기 지원 불가능 시",
+"sort_order": 910
+},
+{
+"category": "기타비용",
+"name": "시간추가",
+"spec": "시간",
+"unit_price": 30000,
+"type": "extra",
+"note": "기본 제공 3시간 외 추가 시",
+"sort_order": 920
+},
+{
+"category": "기타비용",
+"name": "출력물 추가",
+"spec": "장",
+"unit_price": 20000,
+"type": "extra",
+"note": "차량부착용 현수막, X배너 등",
+"sort_order": 930
+},
+{
+"category": "기타비용",
+"name": "스티커 추가",
+"spec": "회",
+"unit_price": 40000,
+"type": "extra",
+"note": "최소주문수량 1,000장~",
+"sort_order": 940
+},
+{
+"category": "기타비용",
+"name": "모니터(영상재생) 추가",
+"spec": "대",
+"unit_price": 30000,
+"type": "extra",
+"note": "LG 스탠바이미 Go",
+"sort_order": 950
+},
+{
+"category": "기타비용",
+"name": "섹터이동",
+"spec": "구역",
+"unit_price": 50000,
+"type": "extra",
+"note": "같은 지역 내 A구역→B구역 이동",
+"sort_order": 960
+},
+{
+"category": "기타비용",
+"name": "실내부스 pop up 등",
+"spec": "회",
+"unit_price": 150000,
+"type": "extra",
+"note": null,
+"sort_order": 970
+},
+{
+"category": "서비스",
+"name": "현수막 서비스",
+"spec": "",
+"unit_price": 0,
+"type": "service",
+"note": "무상 제공 시 (금액 없이 품명만 노란 강조)",
+"sort_order": 980
+},
+{
+"category": "서비스",
+"name": "스티커 서비스",
+"spec": "",
+"unit_price": 0,
+"type": "service",
+"note": "무상 제공 시",
+"sort_order": 990
+}
+]
+}
