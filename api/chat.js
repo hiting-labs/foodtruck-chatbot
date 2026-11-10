@@ -10,6 +10,11 @@ const { sendLeadAlert } = require('../lib/lead-notify.js');
 const { logLead } = require('../lib/sheet-log.js');
 const { logChat } = require('../lib/chat-log.js');
 const { capacityCheck, capacityGuide } = require('../lib/capacity.js');
+const { checkRate, limitMessage } = require('../lib/rate-limit.js');
+
+// 대화 크기 제한 (비용·악용 방지): 손님 말 40번 넘으면 전화 안내, 한 말은 2,000자까지
+const MAX_USER_TURNS = Number(process.env.CHAT_MAX_TURNS) || 40;
+const MAX_USER_CHARS = 2000, MAX_BOT_CHARS = 6000, MAX_MESSAGES = 100;
 
 // 상담용 모델. 환경변수 CHAT_MODEL로 바꿀 수 있음(기본 claude-sonnet-5-5, 되돌리려면 claude-sonnet-4-6). Sonnet 5.5는 생각 설정(CHAT_THINKING·CHAT_EFFORT)을 같이 맞춤
 const MODEL = process.env.CHAT_MODEL || 'claude-sonnet-5-5';   // 2026-11-10 4.6 → 5.5 (회귀 17개·시험 손님 30명 비교: 2배 빠르고 약 1/3 저렴, 품질 같거나 나음)
@@ -151,9 +156,24 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'POST only' });
   }
   try {
-    const { messages, sessionId, page } = req.body || {};
-    if (!Array.isArray(messages)) {
+    const { messages: rawMessages, sessionId, page } = req.body || {};
+    if (!Array.isArray(rawMessages)) {
       return res.status(400).json({ error: 'messages 배열이 필요합니다.' });
+    }
+    // 손님 화면이 보내는 건 글자 대화뿐 — 그 외 모양은 버리고, 너무 긴 말은 자름
+    const messages = rawMessages
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+      .slice(-MAX_MESSAGES)
+      .map(m => ({ role: m.role, content: m.content.slice(0, m.role === 'user' ? MAX_USER_CHARS : MAX_BOT_CHARS) }));
+    while (messages.length && messages[0].role !== 'user') messages.shift();
+    if (!messages.length) return res.status(400).json({ error: '메시지가 비어 있어요.' });
+
+    // 호출 횟수 제한 — 걸리면 AI를 부르지 않고 안내만 (손님 화면엔 보통 답처럼 보임)
+    const rate = await checkRate('chat', req);
+    if (!rate.ok) return res.status(200).json({ reply: limitMessage(rate.why), limited: rate.why });
+    const lastSaysPhone = /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/.test(messages[messages.length - 1].content);   // 연락처를 남기는 말은 길어도 받아서 접수
+    if (messages.filter(m => m.role === 'user').length > MAX_USER_TURNS && !lastSaysPhone) {
+      return res.status(200).json({ reply: '대화가 길어져서 여기부터는 담당자가 직접 도와드리는 게 정확해요. 대표번호 1877-6901로 전화 주시거나, 성함과 연락처를 남겨 주시면 담당자가 연락드릴게요. 새로 상담하시려면 위의 ↺ 새로 시작을 눌러 주세요.', limited: 'turns' });
     }
 
     const convo = [...messages];

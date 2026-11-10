@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { logLead } = require('../lib/sheet-log.js');
 const { logChat } = require('../lib/chat-log.js');
+const { checkRate } = require('../lib/rate-limit.js');
 
 function readRaw(req) {
   return new Promise((resolve) => {
@@ -44,6 +45,9 @@ function pickReason(result, status) {
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST only' }); return; }
+  // 호출 횟수 제한 — 같은 사람이 연달아 누르거나 자동 프로그램이 보내면 문자·기록 없이 거절 (손님 화면: "전화로 문의" 안내)
+  const rate = await checkRate('notify', req);
+  if (!rate.ok) { res.status(429).json({ ok: false, reason: 'too many', limited: rate.why }); return; }
 
   const apiKey = process.env.SOLAPI_API_KEY;
   const apiSecret = process.env.SOLAPI_API_SECRET;
