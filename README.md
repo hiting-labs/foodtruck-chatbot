@@ -1,68 +1,81 @@
-# 푸드트럭하우스 홈페이지 견적 · 상담 챗봇
+# 푸드트럭하우스 견적 · 상담 챗봇
 
-손님이 홈페이지에서 **간편 견적**(메뉴·인분·지역을 골라 바로 계산)이나 **대화 상담**(AI 챗봇에게 말로 물어보기)으로 견적을 받고, 연락처를 남기면 담당자에게 알림이 가는 사이트입니다.
-행사 보드(foodtruck-board)와는 별도 저장소이고, Vercel에 올라갑니다.
+푸드트럭하우스 홈페이지에서 손님이 행사 견적을 바로 받아 보고, 상담을 신청할 수 있는 사이트입니다.
 
-## 화면
+## 주요 기능
 
-| 파일 | 내용 |
-|---|---|
-| `index.html` | 홈페이지 견적 화면 — [간편 견적] · [대화 상담] 두 탭 |
-| `chatbot.html` | 예전 대화형 단독 화면 (지금은 안 씀) |
-| `*-chat.jpg`, `*-zoom.jpg` | 챗봇이 보여 주는 메뉴판 · 현수막 · 우천 캐노피 사진 |
+- **간편 견적**: 메뉴 · 인분 · 지역을 고르면 바로 견적 계산
+- **대화 상담**: AI 챗봇(Claude)에게 말로 물어보면 메뉴 안내와 견적 계산
+- **상담 접수 알림**: 손님이 연락처를 남기면 담당자 문자(알림톡) 발송, 구글시트 · 행사 보드에 기록
+- **메뉴판 연동**: 메뉴 · 단가는 행사 보드(foodtruck-board)의 공개 메뉴판에서 읽어 옴
 
-## 서버 (Vercel 함수)
+## 기술 스택
 
-| 파일 | 하는 일 |
-|---|---|
-| `api/chat.js` | 대화 상담. 손님 말을 Claude(AI)에 넘기고, AI가 견적 계산·상담 접수 도구를 부르면 실행해서 답을 돌려줌. 호출 횟수 제한 · 대화 기록 저장 포함 |
-| `api/menu.js` | 간편 견적 화면이 쓰는 메뉴판 |
-| `api/notify.js` | 간편 견적 상담 신청 → 담당자 문자(알림톡) · 구글시트 · 보드 '챗봇 상담' 기록 |
+- 화면: HTML · CSS · JavaScript (빌드 없음)
+- 서버: Vercel Serverless Functions (Node.js, 외부 패키지 없음)
+- AI: Claude API
+- DB: Supabase (행사 보드 DB)
+- 알림: Solapi (문자 · 카카오 알림톡), Google Sheets
 
-## 핵심 규칙 (lib)
+## 폴더 구조
 
-| 파일 | 내용 |
-|---|---|
-| `lib/quote-calc.js` | **견적 계산** — 간편 견적과 챗봇이 같은 계산을 씀. 최소 금액, 출장비, 현수막, 범위 금액, 장소 섭외 안내 |
-| `lib/quote-engine.js` | 챗봇용 견적 도구 (메뉴 이름 → 메뉴판 단가, 날짜별 차량 여유 안내) |
-| `lib/menu-source.js` | 메뉴판을 **보드 DB의 공개 메뉴판(site_menus)** 에서 읽음 (5분 캐시, 실패하면 `menu-snapshot.json`) |
-| `lib/knowledge.js` | 챗봇 응대 규칙 · 자주 묻는 질문 · 말투 (= AI에게 주는 지시문) |
-| `lib/capacity.js` | 손님이 말한 날짜에 직영 차량 여유를 보고 응대 깊이를 정함 (손님에겐 말하지 않음) |
-| `lib/chat-log.js` | 대화를 보드 DB에 저장 → 보드 더보기 '💬 챗봇 상담'에서 봄 (1년 보관) |
-| `lib/rate-limit.js` | 호출 횟수 제한 (한 사람 1분 10번 · 하루 150번, 전체 하루 2,000번) |
-| `lib/lead-notify.js`, `lib/sheet-log.js` | 상담 접수 문자 · 구글시트 기록 |
+```
+index.html        홈페이지 견적 화면 ([간편 견적] · [대화 상담] 탭)
+chatbot.html      예전 대화형 단독 화면 (지금은 안 씀)
+*.jpg             챗봇이 보여 주는 메뉴판 · 현수막 · 캐노피 사진
+api/
+  chat.js         대화 상담 (Claude 호출, 견적 계산 · 상담 접수 도구 실행)
+  menu.js         간편 견적 화면용 메뉴판
+  notify.js       간편 견적 상담 신청 알림
+lib/
+  quote-calc.js   견적 계산 (간편 견적 · 챗봇 공통)
+  quote-engine.js 챗봇용 견적 도구
+  menu-source.js  메뉴판 읽기 (5분 캐시, 실패 시 menu-snapshot.json)
+  knowledge.js    챗봇 응대 규칙 · 자주 묻는 질문 · 말투
+  capacity.js     날짜별 차량 여유 확인
+  chat-log.js     대화 기록 저장
+  rate-limit.js   호출 횟수 제한
+  lead-notify.js  상담 접수 문자
+  sheet-log.js    구글시트 기록
+```
 
-## 꼭 지킬 것
+## 시작하기
 
-- **가격은 AI가 지어내지 않음** — 모든 금액은 계산 코드(`quote-calc.js`)에서만 나옴.
-- **가격은 이 저장소에 적지 않음** — 보드 견적 메뉴판 한 곳에서만 고침 (보드에서 바꾸면 홈페이지도 같이 바뀜).
-- 키(AI · 문자 · DB 열쇠)는 Vercel 환경변수에만. 화면 코드에 넣지 않음.
+```bash
+git clone https://github.com/hiting-labs/foodtruck-chatbot.git
+cd foodtruck-chatbot
+npm i -g vercel        # Vercel CLI가 없을 때
+vercel link            # Vercel 프로젝트 foodtruck-quote 선택
+vercel env pull .env   # 환경변수 받기 (.env는 커밋하지 않음)
+vercel dev             # http://localhost:3000
+```
 
-## 환경변수 (Vercel)
+## 환경변수
 
 | 이름 | 용도 |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude AI |
-| `CHAT_MODEL` · `CHAT_THINKING` · `CHAT_EFFORT` | 모델 설정 (기본 Sonnet 5.5, 비워 두면 기본값) |
-| `SUPABASE_URL` · `SUPABASE_ANON_KEY` | 보드 DB (비워 두면 운영 DB 공개 키) |
-| `CHAT_LOG_KEY` | 대화 기록 · 호출 횟수 DB 열쇠 (보드 DB `chat_log_secret` 값) |
-| `SOLAPI_*` · `ALERT_TO` · `KAKAO_*` | 담당자 문자 · 알림톡 |
-| `SHEET_WEBHOOK_URL` | 구글시트 기록 (`리드저장_구글시트_설정.md`) |
-| `RL_*` · `CHAT_MAX_TURNS` | 호출 제한 기준 바꿀 때만 |
+| `ANTHROPIC_API_KEY` | Claude API 키 |
+| `CHAT_MODEL` · `CHAT_THINKING` · `CHAT_EFFORT` | 모델 설정 (비워 두면 기본값) |
+| `SUPABASE_URL` · `SUPABASE_ANON_KEY` | 행사 보드 DB |
+| `CHAT_LOG_KEY` | 대화 기록 · 호출 횟수 저장용 키 |
+| `SOLAPI_API_KEY` · `SOLAPI_API_SECRET` · `SOLAPI_SENDER` · `ALERT_TO` | 담당자 문자 |
+| `KAKAO_PFID` · `KAKAO_TEMPLATE_ID` | 카카오 알림톡 |
+| `SHEET_WEBHOOK_URL` | 구글시트 기록 (`리드저장_구글시트_설정.md` 참고) |
+| `RL_*` · `CHAT_MAX_TURNS` | 호출 제한 기준 변경 (선택) |
 
-## 올리는 순서
+키는 Vercel 환경변수에만 둡니다. 화면 코드나 저장소에 넣지 않습니다.
 
-1. `dev` 브랜치에 커밋 → push
-2. GitHub에서 `dev → main` PR → 대표님 계정이 머지 → Vercel이 자동 배포
-3. 보드 DB가 바뀌는 기능이면 **운영 DB에 SQL 먼저** (보드 저장소 `db/` 폴더)
+## 배포
 
-## 시험
+`main` 브랜치에 머지되면 Vercel(프로젝트 `foodtruck-quote`)이 자동으로 운영 배포합니다. PR을 열면 미리보기 배포가 만들어집니다.
 
-- 시험 서버 · 회귀 시험 도구는 저장소 밖(`Desktop\foodtruck-tools`)에 있음 — 테스트 DB 메뉴판으로 돌고 문자는 안 나감.
-- 고친 뒤에는 회귀 시험(대화 23개 자동 채점)을 돌려 답이 망가지지 않았는지 확인.
+## 주의사항
+
+- 가격은 AI가 만들지 않습니다. 모든 금액은 `lib/quote-calc.js`에서만 계산합니다.
+- 가격은 이 저장소에 적지 않습니다. 행사 보드의 견적 메뉴판에서만 고칩니다.
 
 ## 관련 문서
 
-- `CLAUDE.md` — 처음 만들 때의 설계 · 규칙
-- `챗봇_로드맵_메모.md`, `챗봇_채울내용.md` — 진행 메모
-- 보드 쪽 보고서: `Desktop\foodtruck-reports\조사_홈페이지견적챗봇_2026-11-05.html`
+- `CLAUDE.md`: 처음 만들 때의 설계 · 규칙
+- `챗봇_로드맵_메모.md`, `챗봇_채울내용.md`: 진행 메모
+- `리드저장_구글시트_설정.md`: 구글시트 연결 방법
