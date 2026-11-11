@@ -1,0 +1,5 @@
+# 실제 사이트(Vercel)에 올리지 않을 파일 — GitHub에는 그대로 남음
+# 설명·설계·메모 문서는 공개 주소로 열리지 않게 (보드 저장소와 같은 방식)
+*.md
+.gitignore
+.vercelignore

@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "/lib/:path*", "destination": "/", "permanent": false }
+  ]
+}
