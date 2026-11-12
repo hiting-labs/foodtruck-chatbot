@@ -91,7 +91,7 @@ const tools = [
 ];
 
 // 앞선 챗봇 답에 이 말이 있으면 이미 접수한 대화로 봄(서버는 이전 턴을 기억하지 못해서 글로 판단)
-const LEAD_DONE = /접수(가)?\s*(됐|되었|완료)|전달(됐|되었)|has been (submitted|received|passed)/i;
+const LEAD_DONE = /(접수|전달)(가|도|는|이|은)?\s*(잘\s*)?(됐|되었|완료)|has been (submitted|received|passed)/i;   // "접수도 됐어요"·"접수가 완료" 등
 
 // 지난 날짜면 다음 해로 — 모델이 연도를 틀리게 넣는 일(2027-01-15 → 2026-01-15)이 있어서. 담당자가 알 수 있게 표시를 남김
 function fixPastDate(d) {
@@ -118,6 +118,13 @@ function amountText(nums, withVat = true) {
   return `${w(nums)} (부가세 별도${range ? ', 확정 전' : ''})` + (withVat ? ` · 부가세 포함 ${w(nums.map((n) => n * 1.1))}` : '');
 }
 
+// 모델 quote에 금액·기본 말 말고 다른 말("하루치", "제주 출장비 별도 안내" 등)이 있으면 원문을 뒤에 붙임 — 계산 결과로 바꿔 쓸 때 사라지지 않게
+function quoteExtra(modelQuote) {
+  const rest = String(modelQuote || '').replace(/(\d+(?:\.\d+)?)\s*만\s*(?:\d\s*천)?|\d{1,3}(?:,\d{3})+|\d{5,}/g, '')
+    .replace(/합계|약|원|부가세\s*(별도|포함)|출장비\s*포함|확정\s*전|[~()·,./:\s-]/g, '');
+  return rest ? ` / 챗봇 안내: ${modelQuote}` : '';
+}
+
 // 문자 견적 줄. 순서: ① 이번 요청의 calculate_quote 결과(접수가 이번 답보다 먼저 실행돼 대화 기록엔 아직 없음)
 // ② 손님에게 보여 준 "**합계 …**" 줄(계산기 summaryLine) 중 모델 quote와 금액이 같은 것 ③ 모델 quote 그대로(영어 등 합계 줄 없음)
 // 같은 게 없으면(메뉴를 바꿨는데 최소 미달, A·B 비교 등) 둘 다 적고 확인 필요 표시 — 이때 맞지 않는 줄의 부가세 포함은 빼서 확정처럼 안 보이게
@@ -130,12 +137,12 @@ function quoteLine(modelQuote, botTexts, calcs = []) {
     const nums = (c) => (c.mode === 'range' ? [c.rangeLow, c.rangeHigh] : [c.subtotal]);
     const ok = calcs.filter((c) => c.status === 'ok');
     const pick = [...ok].reverse().find((c) => same(nums(c))) || last;   // 같은 요청에 A·B를 계산했으면 모델이 고른 쪽
-    return amountText(nums(pick));
+    return amountText(nums(pick)) + quoteExtra(modelQuote);
   }
   const sums = [];
   for (const t of botTexts) for (const l of String(t || '').split('\n')) if (/^\s*\*\*합계/.test(l)) sums.push(amounts(l.replace(/\(.*$/, '')).slice(0, 2));
   if (!sums.filter((s) => s.length).length) return modelQuote || '';
-  for (let i = sums.length - 1; i >= 0; i--) if (modelQuote && same(sums[i])) return amountText(sums[i]);
+  for (let i = sums.length - 1; i >= 0; i--) if (modelQuote && same(sums[i])) return amountText(sums[i]) + quoteExtra(modelQuote);
   const last = amountText(sums.filter((s) => s.length).pop(), false);
   return modelQuote ? `${modelQuote} / 대화 마지막 합계: ${last} (견적 확인 필요)` : `${last} (견적 확인 필요)`;
 }
@@ -159,7 +166,8 @@ async function handleLead(input, ctx = {}) {
   if (p.menu) lines.push(`메뉴/인분: ${p.menu}`);
   if (p.drinkChoice) lines.push(`음료 구성: ${p.drinkChoice}`);
   if (quote) lines.push(`견적: ${quote}`);
-  if (p.datetime && !when) lines.push(`일정: ${p.datetime}`);   // 날짜·시간 줄이 있으면 같은 내용이라 생략
+  const norm = (s) => String(s).replace(/\s/g, '').replace(/\d{4}-/g, '');   // 연도 보정으로 연도만 달라진 건 같은 글로 봄
+  if (p.datetime && (!when || norm(p.datetime) !== norm(when))) lines.push(`일정: ${p.datetime}`);   // 날짜·시간 줄과 같은 글일 때만 생략(여러 날 일정 등은 남김)
   if (p.note) lines.push(`문의: ${p.note}`);
 
   const res = await sendLeadAlert(lines.join('\n'));
@@ -284,9 +292,10 @@ module.exports = async function handler(req, res) {
         const runTool = async (tu) => {
           let out;
           if (tu.name === 'calculate_quote') {
-            out = await calculateQuote(tu.input);
+            const cin = Object.assign({}, tu.input, tu.input && tu.input.eventDate ? { eventDate: fixPastDate(tu.input.eventDate).date } : {});   // 지난 날짜면 다음 해로(날짜 여유 조회용)
+            out = await calculateQuote(cin);
             calcs.push(out);   // 같은 요청의 접수 문자 견적 줄에 씀
-            meta.tools.push({ name: 'calculate_quote', input: tu.input, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
+            meta.tools.push({ name: 'calculate_quote', input: cin, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
           } else if (tu.name === 'submit_lead') {
             const input = Object.assign({}, tu.input);
             if (leadSent) input.isUpdate = true;   // 모델이 isUpdate를 빠뜨려 같은 손님이 '상담 신청'으로 여러 번 들어가던 일 막기
