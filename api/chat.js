@@ -78,7 +78,7 @@ const tools = [
         contactPerson: { type: 'string', description: '담당자 이름·직함 (예: 김과장)' },
         email: { type: 'string', description: '견적서 받을 이메일' },
         address: { type: 'string', description: '행사 정확한 주소·장소 (예: 성남시 분당구 판교역로 235 광장)' },
-        payMethod: { type: 'string', description: '결제 방식: 세금계산서 / 카드 / 현금영수증 / 계좌이체 중 고객이 말한 것' },
+        payMethod: { type: 'string', description: '결제 방식: 세금계산서 / 카드 / 현금영수증 / 계좌이체 중 고객이 그걸로 하겠다고 정한 것만. "카드 되나요?"처럼 묻기만 했으면 비우고 note에 "카드 결제 문의"' },
         eventDate: { type: 'string', description: '행사 날짜 YYYY-MM-DD (오늘 날짜 기준으로 바꿔서). 모르면 비움' },
         serveTime: { type: 'string', description: '배식 시간 HH:MM~HH:MM (예: 11:00~14:00). 모르면 비움' },
         drinkChoice: { type: 'string', description: '커피 세트 음료 구성: 손님이 고른 음료, 또는 고르지 않았으면 "기본 구성(임시) · 통화 때 확인". 커피 세트가 없으면 비움' },
@@ -249,6 +249,9 @@ module.exports = async function handler(req, res) {
 
     const preTexts = [];   // 도구를 부르기 전에 쓴 글(예: "네, 카드 결제 가능해요!") — 예전엔 마지막 답만 보내서 이 글이 빠졌음
     const calcs = [];   // 이번 요청에서 돌린 calculate_quote 결과(차례대로)
+    // 글자가 있는 가장 최근 손님 말이 한글 없이 영어면 영어 손님("300"처럼 숫자만 있는 말은 건너뜀)
+    const lastWords = [...messages].reverse().find((m) => m.role === 'user' && /[가-힣A-Za-z]/.test(m.content));
+    const english = !!lastWords && !/[가-힣]/.test(lastWords.content) && /[A-Za-z]{2,}/.test(lastWords.content);
     let leadSent = messages.some((m) => m.role === 'assistant' && LEAD_DONE.test(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
     // 도구 호출이 나오면 실행하고 다시 물어보는 루프 (최대 3회)
     for (let i = 0; i < 3; i++) {
@@ -295,6 +298,8 @@ module.exports = async function handler(req, res) {
           if (tu.name === 'calculate_quote') {
             const cin = Object.assign({}, tu.input, tu.input && tu.input.eventDate ? { eventDate: fixPastDate(tu.input.eventDate).date } : {});   // 지난 날짜면 다음 해로(날짜 여유 조회용)
             out = await calculateQuote(cin);
+            // 영어 손님이면 장소 안내 자리에 정해 둔 영어 문구를 넣음(매뉴얼 지시만으로는 한국어 원문이 가끔 그대로 나감)
+            if (english && out.venueNoticeEn) out = Object.assign({}, out, { venueNotice: out.venueNoticeEn });
             calcs.push(out);   // 같은 요청의 접수 문자 견적 줄에 씀
             meta.tools.push({ name: 'calculate_quote', input: cin, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
           } else if (tu.name === 'submit_lead') {
@@ -356,7 +361,9 @@ module.exports = async function handler(req, res) {
       const userTexts = convo.filter((m) => m.role === 'user' && typeof m.content === 'string').map((m) => m.content).join(' ');
       const hasPhone = /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/.test(userTexts) || meta.lead;
       const askedBefore = messages.some((m) => m.role === 'assistant' && /연락처|1877-6901/.test(String(m.content || '')));
-      if (!hasPhone && !askedBefore && /담당자.{0,20}(확인|조율)/.test(reply) && !/연락처|1877-6901/.test(reply)) {
+      // "담당자 확인" 말이 목록 줄(- · •)에만 있으면 원칙 설명 같은 글이라 붙이지 않음(내부 지침 질문 답 끝에 연락처 요청이 붙던 일)
+      const consultLine = reply.split('\n').some((l) => /담당자.{0,20}(확인|조율)/.test(l) && !/^\s*([-·•*]|\d+\.)\s/.test(l));
+      if (!hasPhone && !askedBefore && consultLine && !/연락처|1877-6901/.test(reply)) {
         reply += '\n\n담당자가 전화로 바로 맞춰 드릴 수 있게, 성함(회사명)·연락처와 통화 편한 시간을 알려 주시겠어요? 바로 통화를 원하시면 대표번호 **1877-6901**로 주셔도 돼요.';
       }
       // 상담 기록은 답을 먼저 보낸 뒤 저장 (손님 대기 시간 줄이기). Vercel이 응답 뒤에도 끝까지 기다리게 waitUntil 사용,
