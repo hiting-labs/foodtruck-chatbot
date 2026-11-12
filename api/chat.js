@@ -146,7 +146,8 @@ function drinkPicker(reply) {
   const base = (x) => x.replace(/\(아이스\)/g, '').trim();
   const line = m[2].includes('기본') ? m[2].split(/기본[:：]?/).pop() : m[2];   // "15종 중 7가지 선택 (기본: …)" → 기본 뒤만
   const defaults = line.replace(/[()*]/g, ' ').split(/[·,/]/).map((x) => x.trim()).filter((x) => x && x.length <= 14)
-    .map((x) => CLASSIC_DRINKS.find((c) => base(c) === base(x)) || x);   // "아이스티" → 목록 이름 "아이스티(아이스)"
+    .map((x) => (base(x) === '아이스티' ? '복숭아아이스티' : x))   // 아이스티는 복숭아 하나뿐이라 합침(레몬 등이 생기면 따로 구분)
+    .map((x) => CLASSIC_DRINKS.find((c) => base(c) === base(x)) || x);   // "아샷추" → 목록 이름 "아샷추(아이스)"
   const options = [...new Set([...defaults, ...CLASSIC_DRINKS])];
   return { kind: 'drinks', count, defaults: defaults.slice(0, count), options };
 }
