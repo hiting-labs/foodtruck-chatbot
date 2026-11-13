@@ -73,7 +73,7 @@ const tools = [
         menu: { type: 'string', description: '문의 메뉴·인분 요약(있으면)' },
         quote: { type: 'string', description: '안내한 견적 금액 요약(있으면)' },
         datetime: { type: 'string', description: '행사 날짜·시간(있으면)' },
-        note: { type: 'string', description: '기타 문의·특이사항(있으면)' },
+        note: { type: 'string', description: '기타 문의·특이사항(있으면). 손님이 남긴 번호가 본인 번호가 아니라고 했으면 "본인 번호 아님(손님 말)"을 꼭 적음' },
         company: { type: 'string', description: '회사·기관명 = 견적서 상호/행사명 (예: 판교테크)' },
         contactPerson: { type: 'string', description: '담당자 이름·직함 (예: 김과장)' },
         email: { type: 'string', description: '견적서 받을 이메일' },
@@ -90,8 +90,32 @@ const tools = [
   },
 ];
 
-// 앞선 챗봇 답에 이 말이 있으면 이미 접수한 대화로 봄(서버는 이전 턴을 기억하지 못해서 글로 판단)
-const LEAD_DONE = /(접수|전달)(가|도|는|이|은)?\s*(잘\s*)?(됐|되었|완료)|has been (submitted|received|passed)/i;   // "접수도 됐어요"·"접수가 완료" 등
+// 접수가 실제로 된 답 끝에 서버가 붙이는 정해진 한 줄 — 화면이 답 글을 그대로 다시 보내므로 다음 턴에 이 줄로 '이미 접수됨'을 안다
+// (서버는 이전 턴의 도구 호출을 받지 못함. 모델이 "접수 안 됐다"고 단정하던 일 막기)
+const LEAD_MARK = { ko: '✅ 상담 접수 완료 — 담당자에게 전달됐어요', koUpdate: '✅ 추가 정보 전달 완료 — 담당자에게 전달됐어요', en: '✅ Your request has been sent to our staff.' };
+// 판단은 챗봇 답의 '마지막 줄'이 표시 줄과 정확히 같을 때만 — 모델이 문장 안에서 인용하거나 손님이 붙여 넣은 문구로 잘못 판단하지 않게
+// (예전의 "접수됐어요" 같은 문장 판단은 모델이 접수 없이 말해도 걸려서 쓰지 않음)
+const LEAD_MARKS = Object.values(LEAD_MARK);
+const endsWithLeadMark = (s) => { const ls = String(s || '').trim().split('\n'); return LEAD_MARKS.includes(ls[ls.length - 1].trim()); };
+const LEAD_MARK_ANY = /✅\s*(?=상담 접수 완료|추가 정보 전달 완료|Your request has been sent)/g;   // 모델이 직접 쓴 표시 문구는 ✅만 뗌(문장은 살리고, 표시 줄로는 못 보이게 — 서버만 붙임)
+
+// 손님이 넣은 값 정리 — 담당자 문자에 줄바꿈으로 가짜 머리글·"대표 승인 완료" 같은 줄이 끼던 일 막기
+// 칸마다 줄바꿈을 공백으로, 길이 제한, 링크·머리글처럼 보이면 표시를 붙임
+function cleanLeadValue(v, max) {
+  let s = String(v).replace(/\s+/g, ' ').trim();   // \s는 줄바꿈·탭·줄 구분 문자(U+2028·2029)까지 포함
+  // 꺾쇠는 전각으로 — 보드 화면에 이스케이프 없이 그리는 곳이 있어 태그가 되지 않게(문자는 HTML이 아니라 읽는 데 지장 없음)
+  s = s.replace(/</g, '＜').replace(/>/g, '＞');
+  if (s.length > max) s = s.slice(0, max) + '…';
+  if (/https?:\/\/|www\.|\[[^\]]{0,40}\]/i.test(s)) s += ' (손님 글·확인 안 됨)';
+  return s;
+}
+function cleanLead(input) {
+  const out = {};
+  for (const [k, v] of Object.entries(input || {})) out[k] = typeof v === 'string' ? cleanLeadValue(v, k === 'note' ? 500 : 200) : v;
+  return out;
+}
+// 구글시트에서 =·+·-·@로 시작하는 값은 수식으로 실행될 수 있어 앞에 '를 붙임
+const sheetSafe = (v) => (/^[=+\-@]/.test(String(v || '')) ? "'" + v : (v || ''));
 
 // 지난 날짜면 다음 해로 — 모델이 연도를 틀리게 넣는 일(2027-01-15 → 2026-01-15)이 있어서. 담당자가 알 수 있게 표시를 남김
 function fixPastDate(d) {
@@ -152,9 +176,11 @@ async function handleLead(input, ctx = {}) {
   const p = input || {};
   const quote = quoteLine(p.quote, ctx.botTexts || [], ctx.calcs || []);
   const when = [p.eventDate, p.serveTime].filter(Boolean).join(' ');
+  const org = [p.company, p.contactPerson].filter(Boolean).join(' ');
+  const who = [org, p.contactName && !org.includes(p.contactName) ? p.contactName : ''].filter(Boolean).join(' / ');   // 회사명이 있어도 손님 이름이 빠지지 않게
   const lines = [
     p.isUpdate ? '[푸드트럭하우스 챗봇 상담 · 추가 정보]' : '[푸드트럭하우스 챗봇 상담 신청]',
-    `담당자/회사: ${[p.company, p.contactPerson].filter(Boolean).join(' ') || p.contactName || '-'}`,
+    `담당자/회사: ${who || '-'}`,
     `연락처: ${p.phone || '-'}`,
   ];
   if (p.email) lines.push(`이메일: ${p.email}`);
@@ -176,13 +202,13 @@ async function handleLead(input, ctx = {}) {
   // 시트 칸은 Apps Script에 고정돼 있어 음료 구성은 note에 붙임
   await logLead({
     source: '대화형챗봇',
-    contactName: p.contactName || '',
-    phone: p.phone || '',
-    region: p.region || '',
-    menu: p.menu || '',
-    quote: quote || '',
-    datetime: when ? when + (ctx.dateNote || '') : (p.datetime || ''),
-    note: [p.note, p.drinkChoice && `음료 구성: ${p.drinkChoice}`].filter(Boolean).join(' / '),
+    contactName: sheetSafe(p.contactName),
+    phone: sheetSafe(p.phone),
+    region: sheetSafe(p.region),
+    menu: sheetSafe(p.menu),
+    quote: sheetSafe(quote),
+    datetime: sheetSafe(when ? when + (ctx.dateNote || '') : p.datetime),
+    note: sheetSafe([p.note, p.drinkChoice && `음료 구성: ${p.drinkChoice}`].filter(Boolean).join(' / ')),
   });
 
   // AI에게는 항상 접수됨을 알려 고객에게 안심 안내하도록 한다(발송 실패해도 대화상 리드는 남음).
@@ -249,10 +275,21 @@ module.exports = async function handler(req, res) {
 
     const preTexts = [];   // 도구를 부르기 전에 쓴 글(예: "네, 카드 결제 가능해요!") — 예전엔 마지막 답만 보내서 이 글이 빠졌음
     const calcs = [];   // 이번 요청에서 돌린 calculate_quote 결과(차례대로)
-    // 글자가 있는 가장 최근 손님 말이 한글 없이 영어면 영어 손님("300"처럼 숫자만 있는 말은 건너뜀)
-    const lastWords = [...messages].reverse().find((m) => m.role === 'user' && /[가-힣A-Za-z]/.test(m.content));
-    const english = !!lastWords && !/[가-힣]/.test(lastWords.content) && /[A-Za-z]{2,}/.test(lastWords.content);
-    let leadSent = messages.some((m) => m.role === 'assistant' && LEAD_DONE.test(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
+    let leadKind = null;   // 이번 요청에서 접수했으면 'new'(새 접수) / 'update'(추가 정보)
+    // 글자가 있는 가장 최근 손님 말이 외국어(영어·일본어·중국어 등)면 외국어 손님("300"처럼 숫자만 있는 말은 건너뜀)
+    // 장소 안내·접수 표시 줄은 정해 둔 영어 문구를 씀(일본어·중국어 문구는 따로 없어 영어로)
+    // 메뉴명·이름·지명만 한글로 섞어 쓰는 외국 손님이 있어 "한글이 없을 때만"이 아니라 양으로 판단:
+    // 일본어 가나가 한 글자라도 있으면 외국어 / 아니면 한자 수 + 영문자 수÷2(한글 1글자≈영문 2글자) ≥ 한글 수이면 외국어
+    const FOREIGN = /[A-Za-z]{2,}|[぀-ヿ一-鿿]/;
+    const lastWords = [...messages].reverse().find((m) => m.role === 'user' && (/[가-힣]/.test(m.content) || FOREIGN.test(m.content)));
+    const count = (s, re) => (String(s).match(re) || []).length;
+    const english = !!lastWords && FOREIGN.test(lastWords.content) && (/[぀-ヿ]/.test(lastWords.content)
+      || count(lastWords.content, /[一-鿿]/g) + count(lastWords.content, /[A-Za-z]/g) / 2 >= count(lastWords.content, /[가-힣]/g));
+    // 이 대화에서 현수막 위치를 이미 물었으면(앞선 챗봇 답에 그 질문) 계산기의 "현수막 한 번 물어보세요" 안내를 빼고 넘김 — 매번 다시 묻던 일
+    const askedBanner = messages.some((m) => m.role === 'assistant' && /좌·우 옆면|X배너에도/.test(m.content));
+    let leadSent = messages.some((m) => m.role === 'assistant' && endsWithLeadMark(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
+    // 이미 접수한 대화면 모델에게도 알림(앞 턴의 도구 호출은 모델에 가지 않아 "접수 안 됐다"고 단정하던 일)
+    const leadNote = leadSent ? [{ type: 'text', text: '[봇에게] 이 대화에서는 이미 상담 접수가 됐어요(담당자에게 전달됨). 손님이 접수 여부를 물으면 "네, 접수돼 있어요"라고 답하고, 정보를 보태면 submit_lead로 추가하세요. 내부 도구 이름은 말하지 않습니다.' }] : [];
     // 도구 호출이 나오면 실행하고 다시 물어보는 루프 (최대 3회)
     for (let i = 0; i < 3; i++) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -272,6 +309,7 @@ module.exports = async function handler(req, res) {
             { type: 'text', text: SYSTEM_KNOWLEDGE },
             { type: 'text', text: menuText, cache_control: { type: 'ephemeral' } },
             { type: 'text', text: todayText() },   // 날짜는 캐시 지점 뒤에(매일 바뀜)
+            ...leadNote,
           ],
           tools,
           messages: convo,
@@ -300,10 +338,11 @@ module.exports = async function handler(req, res) {
             out = await calculateQuote(cin);
             // 영어 손님이면 장소 안내 자리에 정해 둔 영어 문구를 넣음(매뉴얼 지시만으로는 한국어 원문이 가끔 그대로 나감)
             if (english && out.venueNoticeEn) out = Object.assign({}, out, { venueNotice: out.venueNoticeEn });
+            if (askedBanner && Array.isArray(out.notes)) out = Object.assign({}, out, { notes: out.notes.filter((n) => !/현수막 위치를 아직 안 물어봤어요/.test(n)) });
             calcs.push(out);   // 같은 요청의 접수 문자 견적 줄에 씀
             meta.tools.push({ name: 'calculate_quote', input: cin, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
           } else if (tu.name === 'submit_lead') {
-            const input = Object.assign({}, tu.input);
+            const input = cleanLead(tu.input);   // 손님이 넣은 값 정리(문자·시트·보드 기록 모두 이 값)
             if (leadSent) input.isUpdate = true;   // 모델이 isUpdate를 빠뜨려 같은 손님이 '상담 신청'으로 여러 번 들어가던 일 막기
             leadSent = true;
             const fd = fixPastDate(input.eventDate); input.eventDate = fd.date;
@@ -319,6 +358,7 @@ module.exports = async function handler(req, res) {
             out = Object.assign({}, out, { reminder: '[봇에게] 손님의 마지막 말에 질문(결제·가격·가능 여부 등)이 있었다면 답의 첫 줄에서 그 질문에 먼저 답한 뒤 접수 안내를 하세요.' });
             meta.tools.push({ name: 'submit_lead', input, status: out.status, capacity: cap ? cap.level : undefined });
             meta.lead = true;
+            leadKind = leadKind === 'new' || !input.isUpdate ? 'new' : 'update';   // 답 끝 접수 표시 줄 고르기
           } else {
             out = { error: 'unknown tool' };
           }
@@ -343,15 +383,21 @@ module.exports = async function handler(req, res) {
       const finalText = data.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
       const key = (s) => s.replace(/[\s*#😊🙂🎉😅📞👍✅!.,~?]/g, '');
       const finalKey = key(finalText);
+      // 같은 내용을 다른 말로 두 번 쓴 문단 거르기: 두 글자 묶음 겹침 비율(같은 뜻 중복 0.7~0.8 / 다른 내용 0~0.1, 시험 대화로 잼)
+      const grams = (s) => { const k = key(s), g = new Set(); for (let j = 0; j < k.length - 1; j++) g.add(k.slice(j, j + 2)); return g; };
+      const finalGrams = finalText.split('\n').filter((l) => key(l).length >= 10).map(grams);
+      const nearDup = (l) => { const A = grams(l); if (A.size < 9) return false; return finalGrams.some((B) => { let n = 0; for (const x of A) if (B.has(x)) n++; return n / Math.min(A.size, B.size) >= 0.6; }); };
       const ANNOUNCE = /접수|견적.{0,4}(나왔|뽑아|내\s*드릴)|계산해|확인해 드릴게요|정리해 드릴게요|감사해요!?$|감사합니다!?$/;
       const keptPre = preTexts.map((p) => p.split('\n').filter((l) => {
         const k = key(l); if (!k) return true;
         // "접수할게요" 같은 알림 줄은 빼되, "네, 카드 결제 가능해요! 접수할게요"처럼 질문 답이 섞인 줄은 남김
         if (ANNOUNCE.test(l.trim()) && l.trim().length < 60 && !/가능|돼요|됩니다|어려|안\s*돼|있어요|없어요/.test(l)) return false;
-        return !(k.length >= 6 && finalKey.includes(k));
+        if (k.length >= 6 && finalKey.includes(k)) return false;
+        return !nearDup(l);   // 도구 전 글과 최종 글이 같은 내용이면 최종 글만
       }).join('\n').trim()).filter(Boolean);
       let reply = [...keptPre, finalText]
         .join('\n\n')
+        .replace(/<br\s*\/?>/gi, '\n')                   // 답에 <br>이 글자 그대로 보이던 것
         .replace(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/gm, '')   // 채팅창에 그대로 보이는 구분선 줄 제거
         .replace(/^\s*>\s?/gm, '')                       // 인용 기호(>)도 그대로 보여서 제거
         .replace(/\n{3,}/g, '\n\n')
@@ -366,6 +412,9 @@ module.exports = async function handler(req, res) {
       if (!hasPhone && !askedBefore && consultLine && !/연락처|1877-6901/.test(reply)) {
         reply += '\n\n담당자가 전화로 바로 맞춰 드릴 수 있게, 성함(회사명)·연락처와 통화 편한 시간을 알려 주시겠어요? 바로 통화를 원하시면 대표번호 **1877-6901**로 주셔도 돼요.';
       }
+      // 이번 요청에서 접수했으면 답 끝에 정해진 접수 표시 줄(다음 턴의 '이미 접수됨' 판단 근거 + 손님에게도 분명히)
+      reply = reply.replace(LEAD_MARK_ANY, '').replace(/\n{3,}/g, '\n\n').trim();   // 표시 줄은 서버만 붙임
+      if (leadKind) reply += '\n\n' + (english ? LEAD_MARK.en : leadKind === 'update' ? LEAD_MARK.koUpdate : LEAD_MARK.ko);
       // 상담 기록은 답을 먼저 보낸 뒤 저장 (손님 대기 시간 줄이기). Vercel이 응답 뒤에도 끝까지 기다리게 waitUntil 사용,
       // 그 기능이 없는 곳(로컬 시험 서버 등)에서는 예전처럼 저장하고 나서 보냄
       // 이번 답의 비용(달러) — 대화 기록(meta.usage)에 남겨 보드에서 대화별 비용을 볼 수 있게
