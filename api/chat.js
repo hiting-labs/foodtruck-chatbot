@@ -276,9 +276,17 @@ module.exports = async function handler(req, res) {
     const preTexts = [];   // 도구를 부르기 전에 쓴 글(예: "네, 카드 결제 가능해요!") — 예전엔 마지막 답만 보내서 이 글이 빠졌음
     const calcs = [];   // 이번 요청에서 돌린 calculate_quote 결과(차례대로)
     let leadKind = null;   // 이번 요청에서 접수했으면 'new'(새 접수) / 'update'(추가 정보)
-    // 글자가 있는 가장 최근 손님 말이 한글 없이 영어면 영어 손님("300"처럼 숫자만 있는 말은 건너뜀)
-    const lastWords = [...messages].reverse().find((m) => m.role === 'user' && /[가-힣A-Za-z]/.test(m.content));
-    const english = !!lastWords && !/[가-힣]/.test(lastWords.content) && /[A-Za-z]{2,}/.test(lastWords.content);
+    // 글자가 있는 가장 최근 손님 말이 외국어(영어·일본어·중국어 등)면 외국어 손님("300"처럼 숫자만 있는 말은 건너뜀)
+    // 장소 안내·접수 표시 줄은 정해 둔 영어 문구를 씀(일본어·중국어 문구는 따로 없어 영어로)
+    // 메뉴명·이름·지명만 한글로 섞어 쓰는 외국 손님이 있어 "한글이 없을 때만"이 아니라 양으로 판단:
+    // 일본어 가나가 한 글자라도 있으면 외국어 / 아니면 한자 수 + 영문자 수÷2(한글 1글자≈영문 2글자) ≥ 한글 수이면 외국어
+    const FOREIGN = /[A-Za-z]{2,}|[぀-ヿ一-鿿]/;
+    const lastWords = [...messages].reverse().find((m) => m.role === 'user' && (/[가-힣]/.test(m.content) || FOREIGN.test(m.content)));
+    const count = (s, re) => (String(s).match(re) || []).length;
+    const english = !!lastWords && FOREIGN.test(lastWords.content) && (/[぀-ヿ]/.test(lastWords.content)
+      || count(lastWords.content, /[一-鿿]/g) + count(lastWords.content, /[A-Za-z]/g) / 2 >= count(lastWords.content, /[가-힣]/g));
+    // 이 대화에서 현수막 위치를 이미 물었으면(앞선 챗봇 답에 그 질문) 계산기의 "현수막 한 번 물어보세요" 안내를 빼고 넘김 — 매번 다시 묻던 일
+    const askedBanner = messages.some((m) => m.role === 'assistant' && /좌·우 옆면|X배너에도/.test(m.content));
     let leadSent = messages.some((m) => m.role === 'assistant' && endsWithLeadMark(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
     // 이미 접수한 대화면 모델에게도 알림(앞 턴의 도구 호출은 모델에 가지 않아 "접수 안 됐다"고 단정하던 일)
     const leadNote = leadSent ? [{ type: 'text', text: '[봇에게] 이 대화에서는 이미 상담 접수가 됐어요(담당자에게 전달됨). 손님이 접수 여부를 물으면 "네, 접수돼 있어요"라고 답하고, 정보를 보태면 submit_lead로 추가하세요. 내부 도구 이름은 말하지 않습니다.' }] : [];
@@ -330,6 +338,7 @@ module.exports = async function handler(req, res) {
             out = await calculateQuote(cin);
             // 영어 손님이면 장소 안내 자리에 정해 둔 영어 문구를 넣음(매뉴얼 지시만으로는 한국어 원문이 가끔 그대로 나감)
             if (english && out.venueNoticeEn) out = Object.assign({}, out, { venueNotice: out.venueNoticeEn });
+            if (askedBanner && Array.isArray(out.notes)) out = Object.assign({}, out, { notes: out.notes.filter((n) => !/현수막 위치를 아직 안 물어봤어요/.test(n)) });
             calcs.push(out);   // 같은 요청의 접수 문자 견적 줄에 씀
             meta.tools.push({ name: 'calculate_quote', input: cin, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
           } else if (tu.name === 'submit_lead') {
@@ -374,15 +383,21 @@ module.exports = async function handler(req, res) {
       const finalText = data.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
       const key = (s) => s.replace(/[\s*#😊🙂🎉😅📞👍✅!.,~?]/g, '');
       const finalKey = key(finalText);
+      // 같은 내용을 다른 말로 두 번 쓴 문단 거르기: 두 글자 묶음 겹침 비율(같은 뜻 중복 0.7~0.8 / 다른 내용 0~0.1, 시험 대화로 잼)
+      const grams = (s) => { const k = key(s), g = new Set(); for (let j = 0; j < k.length - 1; j++) g.add(k.slice(j, j + 2)); return g; };
+      const finalGrams = finalText.split('\n').filter((l) => key(l).length >= 10).map(grams);
+      const nearDup = (l) => { const A = grams(l); if (A.size < 9) return false; return finalGrams.some((B) => { let n = 0; for (const x of A) if (B.has(x)) n++; return n / Math.min(A.size, B.size) >= 0.6; }); };
       const ANNOUNCE = /접수|견적.{0,4}(나왔|뽑아|내\s*드릴)|계산해|확인해 드릴게요|정리해 드릴게요|감사해요!?$|감사합니다!?$/;
       const keptPre = preTexts.map((p) => p.split('\n').filter((l) => {
         const k = key(l); if (!k) return true;
         // "접수할게요" 같은 알림 줄은 빼되, "네, 카드 결제 가능해요! 접수할게요"처럼 질문 답이 섞인 줄은 남김
         if (ANNOUNCE.test(l.trim()) && l.trim().length < 60 && !/가능|돼요|됩니다|어려|안\s*돼|있어요|없어요/.test(l)) return false;
-        return !(k.length >= 6 && finalKey.includes(k));
+        if (k.length >= 6 && finalKey.includes(k)) return false;
+        return !nearDup(l);   // 도구 전 글과 최종 글이 같은 내용이면 최종 글만
       }).join('\n').trim()).filter(Boolean);
       let reply = [...keptPre, finalText]
         .join('\n\n')
+        .replace(/<br\s*\/?>/gi, '\n')                   // 답에 <br>이 글자 그대로 보이던 것
         .replace(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/gm, '')   // 채팅창에 그대로 보이는 구분선 줄 제거
         .replace(/^\s*>\s?/gm, '')                       // 인용 기호(>)도 그대로 보여서 제거
         .replace(/\n{3,}/g, '\n\n')
