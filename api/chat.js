@@ -93,9 +93,11 @@ const tools = [
 // 접수가 실제로 된 답 끝에 서버가 붙이는 정해진 한 줄 — 화면이 답 글을 그대로 다시 보내므로 다음 턴에 이 줄로 '이미 접수됨'을 안다
 // (서버는 이전 턴의 도구 호출을 받지 못함. 모델이 "접수 안 됐다"고 단정하던 일 막기)
 const LEAD_MARK = { ko: '✅ 상담 접수 완료 — 담당자에게 전달됐어요', koUpdate: '✅ 추가 정보 전달 완료 — 담당자에게 전달됐어요', en: '✅ Your request has been sent to our staff.' };
-const LEAD_MARK_RE = /✅ (상담 접수 완료|추가 정보 전달 완료)|✅ Your request has been sent/;
-// 이 줄이 생기기 전 대화를 위한 보조 판단: 앞선 챗봇 답의 접수 완료 문장("접수도 됐어요"·"접수했어요"·"접수해 두었어요" 등)
-const LEAD_DONE = /(접수|전달)\s*(처리\s*)?(가|도|는|이|은)?\s*(잘\s*)?(됐|되었|완료|했|해\s*(두었|뒀|드렸))|has been (submitted|received|passed|sent)/i;
+// 판단은 챗봇 답의 '마지막 줄'이 표시 줄과 정확히 같을 때만 — 모델이 문장 안에서 인용하거나 손님이 붙여 넣은 문구로 잘못 판단하지 않게
+// (예전의 "접수됐어요" 같은 문장 판단은 모델이 접수 없이 말해도 걸려서 쓰지 않음)
+const LEAD_MARKS = Object.values(LEAD_MARK);
+const endsWithLeadMark = (s) => { const ls = String(s || '').trim().split('\n'); return LEAD_MARKS.includes(ls[ls.length - 1].trim()); };
+const LEAD_MARK_ANY = /✅\s*(?=상담 접수 완료|추가 정보 전달 완료|Your request has been sent)/g;   // 모델이 직접 쓴 표시 문구는 ✅만 뗌(문장은 살리고, 표시 줄로는 못 보이게 — 서버만 붙임)
 
 // 손님이 넣은 값 정리 — 담당자 문자에 줄바꿈으로 가짜 머리글·"대표 승인 완료" 같은 줄이 끼던 일 막기
 // 칸마다 줄바꿈을 공백으로, 길이 제한, 링크·머리글처럼 보이면 표시를 붙임
@@ -277,7 +279,7 @@ module.exports = async function handler(req, res) {
     // 글자가 있는 가장 최근 손님 말이 한글 없이 영어면 영어 손님("300"처럼 숫자만 있는 말은 건너뜀)
     const lastWords = [...messages].reverse().find((m) => m.role === 'user' && /[가-힣A-Za-z]/.test(m.content));
     const english = !!lastWords && !/[가-힣]/.test(lastWords.content) && /[A-Za-z]{2,}/.test(lastWords.content);
-    let leadSent = messages.some((m) => m.role === 'assistant' && (LEAD_MARK_RE.test(m.content) || LEAD_DONE.test(m.content)));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
+    let leadSent = messages.some((m) => m.role === 'assistant' && endsWithLeadMark(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
     // 이미 접수한 대화면 모델에게도 알림(앞 턴의 도구 호출은 모델에 가지 않아 "접수 안 됐다"고 단정하던 일)
     const leadNote = leadSent ? [{ type: 'text', text: '[봇에게] 이 대화에서는 이미 상담 접수가 됐어요(담당자에게 전달됨). 손님이 접수 여부를 물으면 "네, 접수돼 있어요"라고 답하고, 정보를 보태면 submit_lead로 추가하세요. 내부 도구 이름은 말하지 않습니다.' }] : [];
     // 도구 호출이 나오면 실행하고 다시 물어보는 루프 (최대 3회)
@@ -396,6 +398,7 @@ module.exports = async function handler(req, res) {
         reply += '\n\n담당자가 전화로 바로 맞춰 드릴 수 있게, 성함(회사명)·연락처와 통화 편한 시간을 알려 주시겠어요? 바로 통화를 원하시면 대표번호 **1877-6901**로 주셔도 돼요.';
       }
       // 이번 요청에서 접수했으면 답 끝에 정해진 접수 표시 줄(다음 턴의 '이미 접수됨' 판단 근거 + 손님에게도 분명히)
+      reply = reply.replace(LEAD_MARK_ANY, '').replace(/\n{3,}/g, '\n\n').trim();   // 표시 줄은 서버만 붙임
       if (leadKind) reply += '\n\n' + (english ? LEAD_MARK.en : leadKind === 'update' ? LEAD_MARK.koUpdate : LEAD_MARK.ko);
       // 상담 기록은 답을 먼저 보낸 뒤 저장 (손님 대기 시간 줄이기). Vercel이 응답 뒤에도 끝까지 기다리게 waitUntil 사용,
       // 그 기능이 없는 곳(로컬 시험 서버 등)에서는 예전처럼 저장하고 나서 보냄
