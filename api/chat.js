@@ -90,37 +90,99 @@ const tools = [
   },
 ];
 
-// 상담 리드를 담당자에게 문자로 발송
-async function handleLead(input) {
+// 앞선 챗봇 답에 이 말이 있으면 이미 접수한 대화로 봄(서버는 이전 턴을 기억하지 못해서 글로 판단)
+const LEAD_DONE = /(접수|전달)(가|도|는|이|은)?\s*(잘\s*)?(됐|되었|완료)|has been (submitted|received|passed)/i;   // "접수도 됐어요"·"접수가 완료" 등
+
+// 지난 날짜면 다음 해로 — 모델이 연도를 틀리게 넣는 일(2027-01-15 → 2026-01-15)이 있어서. 담당자가 알 수 있게 표시를 남김
+function fixPastDate(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return { date: d, note: '' };
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  if (d >= today) return { date: d, note: '' };
+  const next = (Number(d.slice(0, 4)) + 1) + d.slice(4);
+  return next >= today ? { date: next, note: ' (연도 자동 보정, 확인 필요)' } : { date: d, note: ' (지난 날짜, 확인 필요)' };
+}
+
+// 글 속 금액 → 숫자 목록 ("1,215,000~1,350,000원", "133만 1천 원")
+function amounts(s) {
+  const out = [];
+  for (const m of String(s || '').matchAll(/(\d+(?:\.\d+)?)\s*만\s*(?:(\d)\s*천)?|\d{1,3}(?:,\d{3})+|\d{5,}/g)) {
+    out.push(m[1] ? Math.round(Number(m[1]) * 10000 + (m[2] ? Number(m[2]) * 1000 : 0)) : Number(m[0].replace(/,/g, '')));
+  }
+  return out;
+}
+
+// 금액 숫자(1개=한 금액, 2개=범위) → 문자 견적 줄. withVat=false면 부가세 포함은 빼고 씀
+function amountText(nums, withVat = true) {
+  const won = (n) => Math.round(n).toLocaleString('ko-KR');
+  const range = nums.length > 1, w = (xs) => (range ? '약 ' : '') + xs.map(won).join('~') + '원';
+  return `${w(nums)} (부가세 별도${range ? ', 확정 전' : ''})` + (withVat ? ` · 부가세 포함 ${w(nums.map((n) => n * 1.1))}` : '');
+}
+
+// 모델 quote에 금액·기본 말 말고 다른 말("하루치", "제주 출장비 별도 안내" 등)이 있으면 원문을 뒤에 붙임 — 계산 결과로 바꿔 쓸 때 사라지지 않게
+function quoteExtra(modelQuote) {
+  const rest = String(modelQuote || '').replace(/(\d+(?:\.\d+)?)\s*만\s*(?:\d\s*천)?|\d{1,3}(?:,\d{3})+|\d{5,}/g, '')
+    .replace(/합계|약|원|부가세\s*(별도|포함)|출장비\s*포함|확정\s*전|[~()·,./:\s-]/g, '');
+  return rest ? ` / 챗봇 안내: ${modelQuote}` : '';
+}
+
+// 문자 견적 줄. 순서: ① 이번 요청의 calculate_quote 결과(접수가 이번 답보다 먼저 실행돼 대화 기록엔 아직 없음)
+// ② 손님에게 보여 준 "**합계 …**" 줄(계산기 summaryLine) 중 모델 quote와 금액이 같은 것 ③ 모델 quote 그대로(영어 등 합계 줄 없음)
+// 같은 게 없으면(메뉴를 바꿨는데 최소 미달, A·B 비교 등) 둘 다 적고 확인 필요 표시 — 이때 맞지 않는 줄의 부가세 포함은 빼서 확정처럼 안 보이게
+function quoteLine(modelQuote, botTexts, calcs = []) {
+  const q = amounts(modelQuote);
+  const same = (nums) => nums.length > 0 && nums.every((n) => q.includes(n));
+  if (calcs.length) {
+    const last = calcs[calcs.length - 1];
+    if (last.status !== 'ok') return modelQuote || '최소 금액 미달 · 수량 조정 상담 필요';
+    const nums = (c) => (c.mode === 'range' ? [c.rangeLow, c.rangeHigh] : [c.subtotal]);
+    const ok = calcs.filter((c) => c.status === 'ok');
+    const pick = [...ok].reverse().find((c) => same(nums(c))) || last;   // 같은 요청에 A·B를 계산했으면 모델이 고른 쪽
+    return amountText(nums(pick)) + quoteExtra(modelQuote);
+  }
+  const sums = [];
+  for (const t of botTexts) for (const l of String(t || '').split('\n')) if (/^\s*\*\*합계/.test(l)) sums.push(amounts(l.replace(/\(.*$/, '')).slice(0, 2));
+  if (!sums.filter((s) => s.length).length) return modelQuote || '';
+  for (let i = sums.length - 1; i >= 0; i--) if (modelQuote && same(sums[i])) return amountText(sums[i]) + quoteExtra(modelQuote);
+  const last = amountText(sums.filter((s) => s.length).pop(), false);
+  return modelQuote ? `${modelQuote} / 대화 마지막 합계: ${last} (견적 확인 필요)` : `${last} (견적 확인 필요)`;
+}
+
+// 상담 리드를 담당자에게 문자로 발송 (ctx: 날짜 보정 표시, 손님에게 보여 준 챗봇 글)
+async function handleLead(input, ctx = {}) {
   const p = input || {};
+  const quote = quoteLine(p.quote, ctx.botTexts || [], ctx.calcs || []);
+  const when = [p.eventDate, p.serveTime].filter(Boolean).join(' ');
   const lines = [
     p.isUpdate ? '[푸드트럭하우스 챗봇 상담 · 추가 정보]' : '[푸드트럭하우스 챗봇 상담 신청]',
     `담당자/회사: ${[p.company, p.contactPerson].filter(Boolean).join(' ') || p.contactName || '-'}`,
     `연락처: ${p.phone || '-'}`,
   ];
   if (p.email) lines.push(`이메일: ${p.email}`);
-  if (p.eventDate || p.serveTime) lines.push(`날짜·시간: ${[p.eventDate, p.serveTime].filter(Boolean).join(' ')}`);
+  if (when) lines.push(`날짜·시간: ${when}${ctx.dateNote || ''}`);
   if (p.address) lines.push(`주소: ${p.address}`);
   if (p.callTime) lines.push(`통화 편한 시간: ${p.callTime}`);
   if (p.payMethod) lines.push(`결제: ${p.payMethod}`);
   if (p.region) lines.push(`지역: ${p.region}`);
   if (p.menu) lines.push(`메뉴/인분: ${p.menu}`);
-  if (p.quote) lines.push(`견적: ${p.quote}`);
-  if (p.datetime) lines.push(`일정: ${p.datetime}`);
+  if (p.drinkChoice) lines.push(`음료 구성: ${p.drinkChoice}`);
+  if (quote) lines.push(`견적: ${quote}`);
+  const norm = (s) => String(s).replace(/\s/g, '').replace(/\d{4}-/g, '');   // 연도 보정으로 연도만 달라진 건 같은 글로 봄
+  if (p.datetime && (!when || norm(p.datetime) !== norm(when))) lines.push(`일정: ${p.datetime}`);   // 날짜·시간 줄과 같은 글일 때만 생략(여러 날 일정 등은 남김)
   if (p.note) lines.push(`문의: ${p.note}`);
 
   const res = await sendLeadAlert(lines.join('\n'));
 
   // 구글시트에도 영구 기록(문자를 놓쳐도 리드를 잃지 않기 위함). 실패해도 무시.
+  // 시트 칸은 Apps Script에 고정돼 있어 음료 구성은 note에 붙임
   await logLead({
     source: '대화형챗봇',
     contactName: p.contactName || '',
     phone: p.phone || '',
     region: p.region || '',
     menu: p.menu || '',
-    quote: p.quote || '',
-    datetime: p.datetime || '',
-    note: p.note || '',
+    quote: quote || '',
+    datetime: when ? when + (ctx.dateNote || '') : (p.datetime || ''),
+    note: [p.note, p.drinkChoice && `음료 구성: ${p.drinkChoice}`].filter(Boolean).join(' / '),
   });
 
   // AI에게는 항상 접수됨을 알려 고객에게 안심 안내하도록 한다(발송 실패해도 대화상 리드는 남음).
@@ -164,7 +226,9 @@ module.exports = async function handler(req, res) {
     const messages = rawMessages
       .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
       .slice(-MAX_MESSAGES)
-      .map(m => ({ role: m.role, content: m.content.slice(0, m.role === 'user' ? MAX_USER_CHARS : MAX_BOT_CHARS) }));
+      .map(m => ({ role: m.role, content: m.role === 'user' && m.content.length > MAX_USER_CHARS
+        ? m.content.slice(0, MAX_USER_CHARS) + '\n\n(손님 말이 너무 길어 뒷부분이 잘렸어요. 놓친 내용이 있을 수 있으니 필요한 건 다시 여쭤보세요.)'   // 잘린 걸 챗봇이 알게
+        : m.content.slice(0, m.role === 'user' ? MAX_USER_CHARS : MAX_BOT_CHARS) }));
     while (messages.length && messages[0].role !== 'user') messages.shift();
     if (!messages.length) return res.status(400).json({ error: '메시지가 비어 있어요.' });
 
@@ -183,6 +247,8 @@ module.exports = async function handler(req, res) {
     const menuText = menuPromptText(await getMenuData());   // 보드 견적 메뉴판 → 챗봇이 아는 메뉴·가격
 
     const preTexts = [];   // 도구를 부르기 전에 쓴 글(예: "네, 카드 결제 가능해요!") — 예전엔 마지막 답만 보내서 이 글이 빠졌음
+    const calcs = [];   // 이번 요청에서 돌린 calculate_quote 결과(차례대로)
+    let leadSent = messages.some((m) => m.role === 'assistant' && LEAD_DONE.test(m.content));   // 이미 접수한 대화면 다음 접수는 '추가 정보'로
     // 도구 호출이 나오면 실행하고 다시 물어보는 루프 (최대 3회)
     for (let i = 0; i < 3; i++) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -223,22 +289,29 @@ module.exports = async function handler(req, res) {
           .split('\n').filter((l) => !FILLER.test(l.trim())).join('\n').trim();
         if (pre) preTexts.push(pre);
 
-        const results = await Promise.all(toolUses.map(async (tu) => {
+        const runTool = async (tu) => {
           let out;
           if (tu.name === 'calculate_quote') {
-            out = await calculateQuote(tu.input);
-            meta.tools.push({ name: 'calculate_quote', input: tu.input, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
+            const cin = Object.assign({}, tu.input, tu.input && tu.input.eventDate ? { eventDate: fixPastDate(tu.input.eventDate).date } : {});   // 지난 날짜면 다음 해로(날짜 여유 조회용)
+            out = await calculateQuote(cin);
+            calcs.push(out);   // 같은 요청의 접수 문자 견적 줄에 씀
+            meta.tools.push({ name: 'calculate_quote', input: cin, status: out.status, subtotal: out.subtotal, rangeLow: out.rangeLow, rangeHigh: out.rangeHigh, mode: out.mode, region: out.region, items: out.items, costs: out.costs, banners: out.banners, capacity: out.capacity });   // 보드에서 견적서 품목 채울 때 씀
           } else if (tu.name === 'submit_lead') {
-            out = await handleLead(tu.input);
+            const input = Object.assign({}, tu.input);
+            if (leadSent) input.isUpdate = true;   // 모델이 isUpdate를 빠뜨려 같은 손님이 '상담 신청'으로 여러 번 들어가던 일 막기
+            leadSent = true;
+            const fd = fixPastDate(input.eventDate); input.eventDate = fd.date;
+            const botTexts = [...messages.filter((m) => m.role === 'assistant').map((m) => m.content), ...preTexts];
+            out = await handleLead(input, { dateNote: fd.note, botTexts, calcs });
             // 날짜가 있으면 그날 직영 여유(보드 '챗봇 상담'에 🟢/🟡/🟠로 표시 + 이후 응대 깊이)
             // 전기 없다는 말이 대화에 있었으면 발전기까지 따져서 판단 (예전엔 빠져서 발전기 모자란 날도 '여유'로 나왔음)
             const allUser = convo.filter((m) => m.role === 'user' && typeof m.content === 'string').map((m) => m.content).join(' ');
             const powerOff = /전기\s*(가|는|도)?\s*(없|안\s*(돼|되|들어)|불가|모르)|콘센트\s*(가|는)?\s*없/.test(allUser);
-            const cap = tu.input && tu.input.eventDate ? await capacityCheck(tu.input.eventDate, tu.input.menu || '', powerOff) : null;
+            const cap = input.eventDate ? await capacityCheck(input.eventDate, input.menu || '', powerOff) : null;
             const guide = capacityGuide(cap); if (guide) out = Object.assign({}, out, { note: guide });
             // 연락처와 함께 온 질문을 접수 인사로 덮어 버리는 일이 잦아서 도구 결과에 다시 짚어 줌
             out = Object.assign({}, out, { reminder: '[봇에게] 손님의 마지막 말에 질문(결제·가격·가능 여부 등)이 있었다면 답의 첫 줄에서 그 질문에 먼저 답한 뒤 접수 안내를 하세요.' });
-            meta.tools.push({ name: 'submit_lead', input: tu.input, status: out.status, capacity: cap ? cap.level : undefined });
+            meta.tools.push({ name: 'submit_lead', input, status: out.status, capacity: cap ? cap.level : undefined });
             meta.lead = true;
           } else {
             out = { error: 'unknown tool' };
@@ -248,7 +321,12 @@ module.exports = async function handler(req, res) {
             tool_use_id: tu.id,
             content: JSON.stringify(out),
           };
-        }));
+        };
+        // 계산을 먼저 다 끝낸 뒤 접수(같은 답에서 둘 다 부르면 접수 문자에 새 견적이 실리게), 접수끼리는 차례로(두 번째가 '추가 정보'가 되게)
+        const done = {};
+        await Promise.all(toolUses.filter((tu) => tu.name !== 'submit_lead').map(async (tu) => { done[tu.id] = await runTool(tu); }));
+        for (const tu of toolUses.filter((t) => t.name === 'submit_lead')) done[tu.id] = await runTool(tu);
+        const results = toolUses.map((tu) => done[tu.id]);
 
         convo.push({ role: 'user', content: results });
         continue; // 결과를 넣고 한 번 더 AI에게 물어본다
